@@ -596,6 +596,13 @@
     box-shadow:0 4px 14px rgba(47,111,237,.35);}
   .pyc-toolbar .btn-primary:hover{filter:brightness(1.08);}
   .pyc-toolbar select{width:auto;padding:7px 12px;font-size:11.5px;background:#141f38;color:#e9eefb;border:1px solid #22314f;border-radius:20px;font-weight:600;}
+
+  .xpertswp-credit{
+    margin-top:28px;padding:16px 4px 8px;border-top:1px solid var(--border);
+    font-size:12.5px;color:var(--muted);text-align:center;line-height:1.6;
+  }
+  .xpertswp-credit a{color:var(--accent-hover);text-decoration:none;font-weight:600;}
+  .xpertswp-credit a:hover{text-decoration:underline;}
 </style>
 </head>
 <body>
@@ -613,7 +620,9 @@
       <span class="tt-track"><span class="tt-thumb" id="ttThumb"></span></span>
       <span class="tt-icon" id="ttIconMoon">🌙</span>
     </div>
-    <div class="footer-note">🔒 Runs entirely in your browser — your dataset never leaves this page.<br>Built for the preview: JS-powered demo of the exported Python app.</div>
+    <div class="footer-note">🔒 Runs entirely in your browser — your dataset never leaves this page.<br>
+      © Developed by <a href="https://xpertswp.com/" target="_blank" rel="noopener" style="color:rgba(199,201,230,.85);text-decoration:underline;">XpertsWP</a>
+    </div>
   </div>
   <div class="main" id="main"></div>
 </div>
@@ -718,7 +727,7 @@ let state = {
       envVars: {}
     }
   },
-  plan: "free",       // "free" | "pro" — gates the features in PRO_FEATURES below
+  plan: "pro",        // all features free for now
   projectFileEdits: {}  // {path: editedContent} — Pro-only manual overrides applied on top of buildProjectFiles()
 };
 
@@ -741,33 +750,10 @@ const PRO_FEATURES = {
   hyperopt: { title:"Hyperparameter Optimization", desc:"Run a lightweight random/grid search over key hyperparameters and keep the best configuration for your chosen model.",
              list:["Random search over model hyperparameters","Live score comparison across trials","Applies the best params automatically"] }
 };
-function isPro(){ return state.plan === "pro"; }
+function isPro(){ return true; } /* all features free for now */
 
 function openUpgradeModal(featureKey){
-  const f = PRO_FEATURES[featureKey] || { title:"Pro feature", desc:"This feature is part of AutoML Studio Pro.", list:[] };
-  const host = document.getElementById('modalHost');
-  host.innerHTML = `<div class="upgrade-modal">
-      <button class="um-close" aria-label="Close">✕</button>
-      <span class="um-badge">⭐ AUTOML STUDIO PRO</span>
-      <h2>Unlock ${f.title}</h2>
-      <div class="um-sub">${f.desc}</div>
-      <ul class="um-list">${f.list.map(x=>`<li>${x}</li>`).join("")}</ul>
-      <div class="um-price">$12<span> / month</span></div>
-      <div class="download-row" style="margin-top:14px;">
-        <button class="btn btn-primary" id="umUpgradeBtn">⭐ Upgrade to Pro</button>
-        <button class="btn" id="umCancelBtn">Not now</button>
-      </div>
-      <div class="um-note">Demo build: "Upgrade" just flips the plan flag below so you can see the unlocked state — wire this button up to Stripe (or your billing provider) to take real payment before shipping.</div>
-    </div>`;
-  host.classList.add('open');
-  host.querySelector('.um-close').onclick = closeUpgradeModal;
-  host.querySelector('#umCancelBtn').onclick = closeUpgradeModal;
-  host.querySelector('#umUpgradeBtn').onclick = ()=>{
-    state.plan = "pro";
-    closeUpgradeModal();
-    showToast("Upgraded to Pro (demo) — all features unlocked");
-    goRender();
-  };
+  showToast("All features are free for now — no upgrade needed");
 }
 function closeUpgradeModal(){
   document.getElementById('modalHost').classList.remove('open');
@@ -1126,7 +1112,7 @@ function renderNav(){
   }
   const sp = document.getElementById('sidebarPlan');
   if(isPro()){
-    sp.innerHTML = `<span class="plan-badge pro">⭐ PRO</span>`;
+    sp.innerHTML = `<span class="plan-badge free">Free</span>`;
   } else {
     const cta = el(`<div class="upgrade-cta"><span class="plan-badge free">FREE PLAN</span><b style="margin-top:8px;">⭐ Go Pro</b>Unlock Backend &amp; Deploy, data/model exports, and unlimited Python Console.</div>`);
     cta.onclick = ()=> openUpgradeModal('deploy');
@@ -2551,16 +2537,39 @@ function pageModel(m){
         <div class="sb-row">Looks like a <b>${cfg.task}</b> problem (based on the target's data type and how many unique values it has).</div>
         <div class="sb-row" style="color:var(--muted);font-size:12.5px;">Tip: drop ID-like / constant / ultra-high-cardinality columns before training — they're listed below when detected.</div>
         ${excludedRow}
-        <div class="sb-row" style="color:var(--muted);">Quick Train applies this setup, skips the columns above, tests a few algorithms on your data, and keeps whichever scores best — you'll see each step (and a live score chart) below.</div>
+        <div class="sb-row" style="margin-top:10px;">
+          <label class="field-label" style="margin-bottom:6px;">🎯 Choose the column you want to predict (target)</label>
+          <select id="bannerTargetSel" style="max-width:320px;">${state.columns.map(c=>`<option value="${c}" ${c===(state.target||cfg.target)?'selected':''}>${c}${c===cfg.target?' — recommended':''}</option>`).join("")}</select>
+          <div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5;">Pick any column as the target. Features update automatically. Quick Train will train to predict <b>this</b> column from the rest.</div>
+        </div>
+        <div class="sb-row" style="color:var(--muted);">Quick Train uses your selected target, skips weak feature columns, tests algorithms, and keeps the best — with a live score chart below.</div>
         <div class="sb-actions">
-          <button class="btn" id="applySuggestBtn">✅ Use this setup (no training yet)</button>
-          <button class="btn btn-primary" id="quickTrainBtn">⚡ Quick Train (auto-pick &amp; train)</button>
+          <button class="btn" id="applySuggestBtn">✅ Use recommended setup</button>
+          <button class="btn btn-primary" id="quickTrainBtn">⚡ Quick Train (on selected target)</button>
         </div>
         <div id="quickTrainSteps"></div>
         <div id="quickTrainSummary"></div>
       </div>`);
     m.appendChild(banner);
 
+    const bannerTargetSel = banner.querySelector('#bannerTargetSel');
+    if(bannerTargetSel){
+      if(!state.target || !state.columns.includes(state.target)) state.target = cfg.target;
+      bannerTargetSel.value = state.target;
+      bannerTargetSel.onchange = ()=>{
+        state.target = bannerTargetSel.value;
+        const usefulness = analyzeColumnUsefulness();
+        let feats = state.columns.filter(c=> c!==state.target && !usefulness[c]?.reason);
+        if(!feats.length) feats = state.columns.filter(c=> c!==state.target);
+        state.features = feats;
+        const vals = state.data.map(r=>r[state.target]).filter(v=>!isMissing(v));
+        const uniq = new Set(vals).size;
+        const isNum = state.dtypes[state.target]==='numeric';
+        state.taskType = (!isNum || uniq <= Math.max(12, state.data.length*0.05)) ? "Classification" : "Regression";
+        render();
+        showToast("Target set to " + state.target);
+      };
+    }
     banner.querySelector('#applySuggestBtn').onclick = ()=>{
       state.target = cfg.target; state.features = cfg.features; state.taskType = cfg.task;
       render();
@@ -2581,9 +2590,9 @@ function pageModel(m){
                 : "Logistic Regression, KNN, Baseline (most frequent)"}</div>
             </label>
             <label class="fw-card" id="qtProCard" style="cursor:pointer;">
-              ${isPro()?'':'<span class="fw-badge">⭐ Pro</span>'}
+              
               <span class="fw-emoji">🚀</span>
-              <div class="fw-name">Advanced algorithms ${isPro()?'':'🔒'}</div>
+              <div class="fw-name">Advanced algorithms</div>
               <div class="fw-desc">${cfg.task==="Regression"
                 ? "Ridge, Decision Tree, Random Forest, Gradient Boosting + free models"
                 : "Decision Tree, Naive Bayes, Random Forest, Gradient Boosting + free models"}</div>
@@ -2723,7 +2732,7 @@ function pageModel(m){
         : '';
       m.appendChild(el(`<div class="info-banner" style="font-size:12.5px;">🧭 Recommended <b>target</b>: <code>${cfg.target}</code>. Recommended <b>features</b> (${cfg.features.length}): ${featPreview}.${exclPreview}</div>`));
     }
-    m.appendChild(el(`<div class="field-label">Target column</div>`));
+    m.appendChild(el(`<div class="field-label">🎯 Target column (what the model predicts)</div>`));
     if(!state.target || !state.columns.includes(state.target)){
       state.target = cfg.target || state.columns[state.columns.length-1];
       state.features = (cfg.features && cfg.features.length) ? cfg.features.slice() : [];
@@ -2833,7 +2842,7 @@ function pageModel(m){
     const proOpts = state.taskType==="Regression" ? PRO_REG : PRO_CLF;
     const opts = isPro() ? freeOpts.concat(proOpts) : freeOpts;
     if(!opts.includes(state.model)) state.model = freeOpts[0];
-    const modelSel = el(`<select>${freeOpts.map(o=>`<option value="${o}" ${o===state.model?'selected':''}>${o}</option>`).join("")}${isPro()?proOpts.map(o=>`<option value="${o}" ${o===state.model?'selected':''}>${o} ⭐</option>`).join(""):proOpts.map(o=>`<option value="${o}" disabled>${o} 🔒 Pro</option>`).join("")}</select>`);
+    const modelSel = el(`<select>${freeOpts.map(o=>`<option value="${o}" ${o===state.model?'selected':''}>${o}</option>`).join("")}${isPro()?proOpts.map(o=>`<option value="${o}" ${o===state.model?'selected':''}>${o}</option>`).join(""):proOpts.map(o=>`<option value="${o}" disabled>${o} 🔒 Pro</option>`).join("")}</select>`);
     modelSel.onchange = ()=>{
       const v = modelSel.value;
       if(!isPro() && proOpts.includes(v)){ openUpgradeModal('advancedModels'); return; }
@@ -2848,7 +2857,7 @@ function pageModel(m){
       tip.querySelector('#advModelsUpgrade').onclick = ()=> openUpgradeModal('advancedModels');
     }
 
-    m.appendChild(el(`<div class="section-h">4. Hyperparameter Optimization ${isPro()?'':'<span class="pro-lock-badge">⭐ Pro</span>'}</div>`));
+    m.appendChild(el(`<div class="section-h">4. Hyperparameter Optimization ${isPro()?'':''}</div>`));
     const hpHost = el(`<div id="hpHost"></div>`);
     m.appendChild(hpHost);
     if(!isPro()){
@@ -3790,7 +3799,25 @@ async function quickTrainAuto(stepsHost, useProModels){
 
   activate(1);
   const cfg = suggestConfig();
-  state.target = cfg.target; state.features = cfg.features; state.taskType = cfg.task;
+  // Prefer the target the user already picked in the Target dropdown; only fall back to auto-suggest
+  if(state.target && state.columns.includes(state.target)){
+    const usefulness = analyzeColumnUsefulness();
+    let feats = state.columns.filter(c=> c!==state.target && !usefulness[c]?.reason);
+    if(!feats.length) feats = state.columns.filter(c=> c!==state.target);
+    state.features = (state.features && state.features.length)
+      ? state.features.filter(f=> f!==state.target && state.columns.includes(f))
+      : feats;
+    if(!state.features.length) state.features = feats;
+    // Infer task from the chosen target
+    const vals = state.data.map(r=>r[state.target]).filter(v=>!isMissing(v));
+    const uniq = new Set(vals).size;
+    const isNum = state.dtypes[state.target]==='numeric';
+    if(state.taskType!=="Clustering"){
+      state.taskType = (!isNum || uniq <= Math.max(12, state.data.length*0.05)) ? "Classification" : "Regression";
+    }
+  } else {
+    state.target = cfg.target; state.features = cfg.features; state.taskType = cfg.task;
+  }
   await wait(200); finish(1);
 
   activate(2); await wait(200); finish(2);
@@ -4181,7 +4208,7 @@ function renderModelDownloadPanel(host){
 
 /* ============================= PAGE 6: EXPORT ============================= */
 function pageExport(m){
-  m.appendChild(el(`<h1 class="page-title"><span class="icon-badge">💾</span>Export Clean Data<span class="pro-lock-badge">⭐ Pro</span></h1>`));
+  m.appendChild(el(`<h1 class="page-title"><span class="icon-badge">💾</span>Export Clean Data</h1>`));
   if(!state.data.length){ m.appendChild(el(`<div class="info-banner">Upload and load a dataset first.</div>`)); return; }
   m.appendChild(el(`<div class="section-h">Processed dataset</div>`));
   m.appendChild(el(`<div style="font-size:13.5px;color:var(--muted);margin-bottom:14px;">${state.data.length} rows × ${state.columns.length} columns, current pipeline state.</div>`));
@@ -5596,7 +5623,7 @@ function renderAppPreviewPanel(host, opts){
 }
 
 function pageDeploy(m){
-  m.appendChild(el(`<h1 class="page-title"><span class="icon-badge">🚀</span>Backend & Deploy<span class="pro-lock-badge">⭐ Pro</span></h1>`));
+  m.appendChild(el(`<h1 class="page-title"><span class="icon-badge">🚀</span>Backend & Deploy</h1>`));
   m.appendChild(el(`<div class="page-sub">Turn what you've built into a real, runnable full-stack application — an API that serves your model, a database connection if you need one, and a downloadable project folder with all the code.</div>`));
   if(!state.data.length){ m.appendChild(el(`<div class="info-banner">Upload and load a dataset first.</div>`)); return; }
 
@@ -6841,6 +6868,7 @@ function render(){
   m.appendChild(el(`<div class="banner-preview">🧪 In-browser preview — real parsing, stats, cleaning, and lightweight JS models running live in your browser. Export a project from <b>Backend & Deploy</b> (FastAPI, Flask, Django, or Streamlit) to get the full scikit-learn version, ready to run or deploy.</div>`));
   const pages = [pageUpload, pageAnalyze, pageClean, pageStats, pageModel, pageDeploy, pageExport, pageCode];
   pages[state.page](m);
+  m.appendChild(el(`<div class="xpertswp-credit" id="xpertswp-credit">© Developed by <a href="https://xpertswp.com/" target="_blank" rel="noopener">XpertsWP</a></div>`));
 }
 render();
 initPyConsole();
